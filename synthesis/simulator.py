@@ -16,13 +16,17 @@ from jaxoplanet.starry.ylm import Ylm, ylm_spot
 from jaxoplanet.starry.surface import Surface
 from jaxoplanet.starry.light_curves import surface_light_curve
 
+from sampling import DATAPOINTS
+
 
 # --- Simulator Constants ---
 
+THETA_DEG = jnp.linspace(
+    0.0, 360.0, DATAPOINTS, endpoint=False, dtype=jnp.float32
+)
+
 YDEG = 11
 YSIZE = (YDEG + 1) * (YDEG + 1)
-
-FIXED_SPOT_CONTRAST = 0.55
 
 UNIT_DENSE = jnp.zeros(YSIZE, dtype=jnp.float32).at[0].set(1.0)
 
@@ -43,12 +47,8 @@ print("... 'ylm_spot' initialized successfully on CPU.")
 
 # --- Simulator Utilities ---
 
-def make_theta_grid(datapoints: int):
-    return jnp.linspace(0.0, 360.0, datapoints, endpoint=False, dtype=jnp.float32)
-
-
 @jit
-def build_spot_map(lats: jnp.ndarray, lons: jnp.ndarray, radii: jnp.ndarray) -> jnp.ndarray:
+def build_spot_map(contrast: float, radii: jnp.ndarray, lats: jnp.ndarray, lons: jnp.ndarray) -> jnp.ndarray:
     """
     Build a dense Y_lm map from sampled spot parameters.
     """
@@ -56,7 +56,7 @@ def build_spot_map(lats: jnp.ndarray, lons: jnp.ndarray, radii: jnp.ndarray) -> 
 
     def add_one(i, y_curr):
         spot = SPOT_FN(
-            contrast=FIXED_SPOT_CONTRAST,
+            contrast=contrast,
             r=jnp.deg2rad(radii[i]),
             lat=jnp.deg2rad(lats[i]),
             lon=jnp.deg2rad(lons[i]),
@@ -103,13 +103,14 @@ def synthesize_light_curve(rng_key, sampled_parameters: Dict[str, jnp.ndarray]) 
     datapoints = sampled_parameters["datapoints"]
     noise = sampled_parameters["noise"]
     inclination = sampled_parameters["inclination"]
+    contrast = sampled_parameters["contrast"]
     n_spots = sampled_parameters["n_spots"]
     lats = sampled_parameters["lats"]
     lons = sampled_parameters["lons"]
     radii = sampled_parameters["radii"]
 
-    theta_deg = make_theta_grid(datapoints)
-    y_spots_dense = build_spot_map(lats, lons, radii)
+    theta_deg = THETA_DEG
+    y_spots_dense = build_spot_map(contrast, radii, lats, lons)
 
     flux = flux_from_map_ylm(
         y_dense=y_spots_dense,
@@ -127,6 +128,7 @@ def synthesize_light_curve(rng_key, sampled_parameters: Dict[str, jnp.ndarray]) 
         "datapoints": datapoints,
         "noise": noise,
         "inclination": inclination,
+        "contrast": contrast,
         "n_spots": n_spots,
         "lats": lats,
         "lons": lons,
@@ -137,3 +139,9 @@ def synthesize_light_curve(rng_key, sampled_parameters: Dict[str, jnp.ndarray]) 
     }
 
     return synthesized_data
+
+
+# Synthesize a batch of light curves from sampled parameter sets.
+synthesize_light_curve_batch = jax.jit(
+    jax.vmap(synthesize_light_curve, in_axes=(0, 0))
+)

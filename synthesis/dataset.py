@@ -16,8 +16,7 @@ from simulator import synthesize_light_curve
 OUTPUT_DIR = "../data"
 SPOT_COUNTS = [1, 2, 3, 4, 5]
 N_DATASETS = 100_000
-
-SEED = 0  # fixed seed for reproducibility
+SEED = 0
 
 
 # --- IO Utilities ---
@@ -46,6 +45,7 @@ def _save_dataset(filename: str, synthesized_data: Dict):
         "datapoints": _scalarize(synthesized_data["datapoints"]),
         "noise": _scalarize(synthesized_data["noise"]),
         "inclination": _scalarize(synthesized_data["inclination"]),
+        "contrast": _scalarize(synthesized_data["contrast"]),
         "n_spots": _scalarize(synthesized_data["n_spots"]),
         "lats": _to_numpy(synthesized_data["lats"]).astype(np.float32),
         "lons": _to_numpy(synthesized_data["lons"]).astype(np.float32),
